@@ -16,11 +16,15 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Maximize2,
+  Minimize2,
+  Tv,
 } from "lucide-react";
 import HlsVideoPlayer from "@/components/player/hls-video-player";
 import ArticleReader from "@/components/student/lessons/article-reader";
 import QuizRunner, { DynamicQuizQuestion } from "@/components/student/lessons/quiz-runner";
 import { getPublicCourseById, getQuizByLessonApi, PublicCourse } from "@/lib/api/public.api";
+import { getSignedPlayback } from "@/lib/api/instructor-video.api";
 
 interface LessonItem {
   id: string;
@@ -49,6 +53,7 @@ export default function StudentCoursePlayerPage({
   const [activeLesson, setActiveLesson] = useState<LessonItem | null>(null);
   const [allFlatLessons, setAllFlatLessons] = useState<LessonItem[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(false);
 
   // Dynamic Instructor Quiz State
   const [quizQuestions, setQuizQuestions] = useState<DynamicQuizQuestion[]>([]);
@@ -92,6 +97,52 @@ export default function StudentCoursePlayerPage({
 
     loadCoursePlayer();
   }, [courseId]);
+
+  // Dynamic HLS Playback Stream State
+  const [playbackUrl, setPlaybackUrl] = useState<string>("");
+  const [loadingPlayback, setLoadingPlayback] = useState<boolean>(false);
+
+  // Fetch signed HLS playback URL when active lesson is a VIDEO
+  useEffect(() => {
+    if (!activeLesson) {
+      setPlaybackUrl("");
+      return;
+    }
+
+    const lessonType = (activeLesson.type || "VIDEO").toUpperCase();
+    if (lessonType !== "VIDEO") {
+      setPlaybackUrl("");
+      return;
+    }
+
+    async function fetchVideoPlayback() {
+      try {
+        setLoadingPlayback(true);
+
+        // Call backend signed HLS stream API endpoint
+        const res = await getSignedPlayback(activeLesson!.id);
+        const streamUrl = res?.playbackUrl || res?.data?.masterPlaylistUrl;
+        if (streamUrl) {
+          setPlaybackUrl(streamUrl);
+        } else if (activeLesson?.videoUrl) {
+          setPlaybackUrl(activeLesson.videoUrl);
+        } else {
+          setPlaybackUrl("");
+        }
+      } catch (err) {
+        console.error("Failed to load signed video playback:", err);
+        if (activeLesson?.videoUrl) {
+          setPlaybackUrl(activeLesson.videoUrl);
+        } else {
+          setPlaybackUrl("");
+        }
+      } finally {
+        setLoadingPlayback(false);
+      }
+    }
+
+    fetchVideoPlayback();
+  }, [activeLesson]);
 
   // Fetch exact instructor questions when active lesson is a QUIZ
   useEffect(() => {
@@ -186,16 +237,31 @@ export default function StudentCoursePlayerPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-          <User className="h-4 w-4 text-indigo-500" />
-          <span>Instructor: <strong className="text-slate-900">{course.instructor?.name || "PRISM Faculty"}</strong></span>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setIsTheaterMode(!isTheaterMode)}
+            className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-extrabold transition cursor-pointer border ${
+              isTheaterMode
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/30"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+            }`}
+          >
+            {isTheaterMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            <span>{isTheaterMode ? "Standard View" : "Theater Mode"}</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <User className="h-4 w-4 text-indigo-500" />
+            <span>Instructor: <strong className="text-slate-900">{course.instructor?.name || "PRISM Faculty"}</strong></span>
+          </div>
         </div>
       </div>
 
       {/* Main Layout Grid (Player/Content on Left, Curriculum Sidebar on Right) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-6 ${isTheaterMode ? "lg:grid-cols-1" : "lg:grid-cols-3"}`}>
         {/* Left Side: Content Renderer (Video / Article / Quiz) */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`space-y-6 ${isTheaterMode ? "lg:col-span-1" : "lg:col-span-2"}`}>
           {activeLesson ? (
             activeLesson.type === "QUIZ" ? (
               loadingQuiz ? (
@@ -218,18 +284,24 @@ export default function StudentCoursePlayerPage({
               />
             ) : (
               <div className="space-y-4">
-                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl">
-                  {activeLesson.videoUrl ? (
+                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl aspect-video max-h-[520px]">
+                  {loadingPlayback ? (
+                    <div className="flex aspect-video w-full flex-col items-center justify-center p-8 text-center text-white space-y-3 bg-slate-950">
+                      <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+                      <p className="text-xs font-bold text-slate-400">Loading HLS Video Stream...</p>
+                    </div>
+                  ) : playbackUrl || activeLesson.videoUrl ? (
                     <HlsVideoPlayer
-                      src={activeLesson.videoUrl}
+                      src={playbackUrl || activeLesson.videoUrl!}
                       poster={course.thumbnail}
+                      onEnded={handleGoNext}
                     />
                   ) : (
                     <div className="flex aspect-video w-full flex-col items-center justify-center p-8 text-center text-white space-y-3 bg-slate-900">
                       <PlayCircle className="h-16 w-16 text-indigo-500 opacity-60" />
                       <h3 className="text-lg font-bold">{activeLesson.title}</h3>
                       <p className="text-xs text-slate-400 max-w-sm">
-                        {activeLesson.content || "Video content for this lesson will stream here."}
+                        {activeLesson.content || "No video stream uploaded for this lesson yet."}
                       </p>
                     </div>
                   )}

@@ -30,7 +30,8 @@ export interface VideoStatusResponse {
 
 export interface PlaybackUrlsResponse {
   message?: string;
-  data: {
+  playbackUrl?: string;
+  data?: {
     lessonId: string;
     title: string;
     masterPlaylistUrl: string;

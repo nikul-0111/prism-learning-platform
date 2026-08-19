@@ -280,15 +280,18 @@ export async function getSignedPlaybackUrls(lessonId: string, userId: string) {
     throw new Error("Lesson not found.");
   }
 
-  if (!lesson.asset || lesson.asset.status !== "READY" || !lesson.asset.masterPlaylistKey) {
+  if ((!lesson.asset || lesson.asset.status !== "READY" || !lesson.asset.masterPlaylistKey) && !lesson.videoUrl) {
     throw new Error("Video is not ready for streaming.");
   }
 
-  const masterPlaylistUrl = await getShortLivedSignedUrl(lesson.asset.masterPlaylistKey, 900);
-  const thumbnailUrl = lesson.asset.thumbnailKey
+  const masterPlaylistUrl = (lesson.asset && lesson.asset.masterPlaylistKey)
+    ? await getShortLivedSignedUrl(lesson.asset.masterPlaylistKey, 900)
+    : lesson.videoUrl || "";
+
+  const thumbnailUrl = lesson.asset?.thumbnailKey
     ? await getShortLivedSignedUrl(lesson.asset.thumbnailKey, 900)
     : null;
-  const spriteSheetUrl = lesson.asset.spriteSheetKey
+  const spriteSheetUrl = lesson.asset?.spriteSheetKey
     ? await getShortLivedSignedUrl(lesson.asset.spriteSheetKey, 900)
     : null;
 
