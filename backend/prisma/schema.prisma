@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  mobileNumber String   @unique
+  email        String   @unique
+  password     String
+  role         UserRole @default(STUDENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  instructor_profiles instructor_profiles?
+  courses             Course[]
+  enrollments         Enrollment[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model instructor_profiles {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("instructor_profiles")
+}
+
+model Course {
+  id               String       @id @default(uuid())
+  title            String
+  shortDescription String?
+  description      String
+  category         String?
+  level            CourseLevel  @default(BEGINNER)
+  price            Float
+  thumbnail        String?
+  status           CourseStatus @default(DRAFT)
+  instructorId     String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  instructor  User         @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  sections    Section[]
+  enrollments Enrollment[]
+
+  @@index([instructorId])
+  @@map("courses")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model Section {
+  id          String   @id @default(uuid())
+  courseId    String
+  title       String
+  description String?
+  position    Int      @default(0)
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseId])
+  @@index([courseId, position])
+  @@map("sections")
+}
+
+model Lesson {
+  id            String     @id @default(uuid())
+  sectionId     String
+  title         String
+  description   String?
+  type          LessonType @default(VIDEO)
+  videoUrl      String?
+  content       String?
+  duration      Int        @default(0)
+  position      Int        @default(0)
+  isFreePreview Boolean    @default(false)
+
+  quizId String? @unique
+  quiz   Quiz?   @relation(fields: [quizId], references: [id], onDelete: SetNull)
+
+  asset Asset?
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sectionId])
+  @@index([sectionId, position])
+  @@map("lessons")
+}
+
+model Quiz {
+  id          String     @id @default(uuid())
+  title       String
+  passMark    Int        @default(70)
+  timeLimit   Int?       @default(15)
+  maxAttempts Int        @default(3)
+  questions   Question[]
+  lesson      Lesson?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("quizzes")
+}
+
+model Question {
+  id       String       @id @default(uuid())
+  quizId   String
+  text     String
+  type     QuestionType @default(MULTIPLE_CHOICE)
+  points   Int          @default(1)
+  position Int          @default(0)
+  answers  Answer[]
+  quiz     Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@map("questions")
+}
+
+model Answer {
+  id         String   @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean  @default(false)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("answers")
+}
+
+model Asset {
+  id                  String      @id @default(uuid())
+  lessonId            String      @unique
+  uploadId            String?
+  objectKey           String
+  originalFileName    String
+  fileSize            BigInt
+  declaredContentType String
+  actualContentType   String?
+  status              AssetStatus @default(UPLOADING)
+  transcodeProgress   Int         @default(0)
+  duration            Int?
+  width               Int?
+  height              Int?
+  masterPlaylistKey   String?
+  thumbnailKey        String?
+  spriteSheetKey      String?
+  errorMessage        String?
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lessonId])
+  @@index([status])
+  @@map("assets")
+}
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  VIDEO
+  ARTICLE
+  QUIZ
+  FILE
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTI_SELECT
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum AssetStatus {
+  UPLOADING
+  UPLOADED
+  VALIDATING
+  QUEUED
+  PROBING
+  TRANSCODING
+  PACKAGING
+  READY
+  FAILED
+}
