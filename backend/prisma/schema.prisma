@@ -18,6 +18,7 @@ model User {
 
   instructor_profiles instructor_profiles?
   courses             Course[]
+  reviewedCourses     Course[]            @relation("CourseReviewer")
   enrollments         Enrollment[]
 
   @@index([email])
@@ -47,14 +48,19 @@ model Course {
   thumbnail        String?
   status           CourseStatus @default(DRAFT)
   instructorId     String
+  reviewedById     String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  instructor  User         @relation(fields: [instructorId], references: [id], onDelete: Cascade)
-  sections    Section[]
+  instructor User         @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  reviewedBy User?        @relation("CourseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  sections   Section[]
   enrollments Enrollment[]
 
   @@index([instructorId])
+  @@index([status])
   @@map("courses")
 }
 
@@ -175,6 +181,8 @@ model Asset {
   thumbnailKey        String?
   spriteSheetKey      String?
   errorMessage        String?
+  isOrphaned          Boolean     @default(false)
+  orphanedAt          DateTime?
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
@@ -200,7 +208,9 @@ enum CourseLevel {
 
 enum CourseStatus {
   DRAFT
+  PENDING_REVIEW
   PUBLISHED
+  REJECTED
   ARCHIVED
 }
 

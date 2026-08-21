@@ -10,26 +10,26 @@ router.use(authMiddleware as any);
 router.use(adminGuard as any);
 
 // Metrics & Overview
-router.get("/metrics", adminController.getMetrics);
+router.get("/metrics", adminController.getMetrics as any);
 
-// Course Approvals Queue
-router.get("/courses/pending", adminController.getPendingCourses);
-router.post("/courses/:id/approve", adminController.approveCourse);
-router.post("/courses/:id/reject", adminController.rejectCourse);
+// Course Approvals Queue, History & Management
+router.get("/courses", adminController.getAllCourses as any);
+router.get("/courses/pending", adminController.getPendingCourses as any);
+router.get("/courses/history", adminController.getApprovalHistory as any);
+router.get("/courses/:id", adminController.getCourseDetails as any);
+router.post("/courses/:id/approve", adminController.approveCourse as any);
+router.post("/courses/:id/reject", adminController.rejectCourse as any);
 
-// Storage & Bandwidth
-router.get("/storage", adminController.getStorageReport);
-router.post("/storage/gc", adminController.runGarbageCollection);
+// Storage & Bandwidth Management
+router.get("/storage", adminController.getStorageReport as any);
+router.post("/storage/gc", adminController.runGarbageCollection as any);
+router.get("/usage", adminController.getBandwidthReport as any);
 
-// Instructor Payouts
-router.get("/payouts", adminController.getPayoutReport);
+// Instructor Payout Reports
+router.get("/payouts", adminController.getPayoutReport as any);
 
-// Transcode Queue Monitor
-router.get("/transcode-queue", adminController.getTranscodeQueueStatus);
-router.post("/transcode-queue/:id/retry", adminController.retryTranscodeJob);
-
-// User Governance
-router.get("/users", adminController.getUsers);
-router.patch("/users/:id/role", adminController.updateUserRole);
+// User Governance & Role Updates
+router.get("/users", adminController.getUsers as any);
+router.patch("/users/:id/role", adminController.updateUserRole as any);
 
 export default router;
